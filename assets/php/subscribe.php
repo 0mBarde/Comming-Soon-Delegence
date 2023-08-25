@@ -1,49 +1,47 @@
 <?php
-
-// ENTER PATH TO FILE
-$file_path = $_SERVER["DOCUMENT_ROOT"] . "/";
-
-// ENTER NAME OF FILE 
-$file_name = "subscriber-list.txt";
-
-
-if($_POST) {
-	
-    $subscriber_email = $_POST['email'];
-	$subscriber_fhp_input = $_POST['phone'];
-	$array = array();
-    
-    if( $subscriber_email == "" ) {
-        
-        $array["valid"] = 0;
-        
-    } else {
-
-        if( !filter_var($subscriber_email, FILTER_VALIDATE_EMAIL) || $subscriber_fhp_input != "") {
-
-            $array["valid"] = 0;
-            $array["message"] = $varErrorValidation;
-
-        } else {
-
-            file_put_contents($file_path.$file_name, strtolower($subscriber_email)."\r\n", FILE_APPEND);
-
-            if (file_exists($file_path.$file_name)) {   
-
-                $array["valid"] = 1;
-
-            } else {
-
-                $array["valid"] = 0;
-
-            }
-
-        }
-        
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // Validate the email address
+    if (!filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
+        echo "Invalid Email Address.";
+        exit();
     }
-	
-	echo json_encode($array);
 
+    // Honeypot check
+    if (!empty($_POST['phone'])) {
+        echo "Honeypot validation failed.";
+        exit();
+    }
+
+    $api_key = "mlsn.d50ae60c48d1ed5861677f68757fc74c1696850bdc467c1d890909b20dee2b7d"; // Replace with your MailerSend API key
+    
+    $recipient_email = $_POST['email']; // Replace with the recipient's email address
+    
+    $request_data = [
+        "to" => [
+            ["email" => $recipient_email]
+        ],
+        "subject" => "New Subscription",
+        "text" => "New subscriber email: {$_POST['email']}"
+    ];
+    
+    $ch = curl_init('https://api.mailersend.com/v1/email');
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($request_data));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $api_key,
+        'Content-Type: application/json'
+    ]);
+    
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    $response_data = json_decode($response, true);
+    
+    if (isset($response_data['id'])) {
+        echo "Successfully Subscribed!";
+    } else {
+        echo "Error subscribing.";
+    }
 }
-
 ?>
